@@ -60,12 +60,13 @@ import LoadingState from './LoadingState';
 
 // Интерфейсы для типизации данных
 interface Workflow {
-	id: number;
-	name: string;
-	description: string;
-	steps: WorkflowStep[];
-	created_at: string;
-	updated_at: string;
+  id: number;
+  name: string;
+  workflow_length: number;
+  description?: string;
+  steps?: WorkflowStep[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface WorkflowStep {
@@ -216,7 +217,17 @@ const ApprovalEditorPage = () => {
 		queryKey: ['admin', 'workflows'],
 		queryFn: async () => {
 			const response = await axiosFetching.get(getWorkflows);
-			return response.data;
+			// Мапим данные API к интерфейсу Workflow
+			return response.data.map((item: any) => ({
+				id: item.workflow_id,
+				name: item.workflow_name,
+				workflow_length: item.workflow_length,
+				// Поля, которых нет в ответе API, оставляем undefined
+				description: undefined,
+				steps: undefined,
+				created_at: undefined,
+				updated_at: undefined,
+			}));
 		},
 	});
 
@@ -1148,69 +1159,54 @@ const ApprovalEditorPage = () => {
 												p: 0,
 											}}
 										>
-											{workflows && workflows.length > 0 ? (
-												<List disablePadding>
-													{workflows.map((workflow: Workflow) => (
-														<ListItem
-															key={workflow.id}
-															button
-															onClick={() => handleWorkflowSelect(workflow)}
-															selected={selectedWorkflow?.id === workflow.id}
-															dense
-															sx={{
-																borderBottom: `1px solid ${alpha(
-																	theme.palette.divider,
-																	0.05
-																)}`,
-																transition: 'all 0.2s',
-																py: 1.5,
-																'&.Mui-selected': {
-																	backgroundColor: alpha(
-																		theme.palette.primary.main,
-																		0.08
-																	),
-																	'&:hover': {
-																		backgroundColor: alpha(
-																			theme.palette.primary.main,
-																			0.12
-																		),
-																	},
-																},
-															}}
+										{workflows && workflows.length > 0 ? (
+											<List disablePadding>
+												{workflows.map((workflow: Workflow) => (
+												<ListItem
+													key={workflow.id}
+													button
+													onClick={() => handleWorkflowSelect(workflow)}
+													selected={selectedWorkflow?.id === workflow.id}
+													dense
+													sx={{
+													borderBottom: `1px solid ${alpha(theme.palette.divider, 0.05)}`,
+													transition: 'all 0.2s',
+													py: 1.5,
+													'&.Mui-selected': {
+														backgroundColor: alpha(theme.palette.primary.main, 0.08),
+														'&:hover': {
+														backgroundColor: alpha(theme.palette.primary.main, 0.12),
+														},
+													},
+													}}
+												>
+													<ListItemIcon sx={{ minWidth: 40 }}>
+													<AccountTreeIcon
+														color={selectedWorkflow?.id === workflow.id ? 'primary' : 'action'}
+													/>
+													</ListItemIcon>
+													<ListItemText
+													primary={workflow.name}
+													secondary={`${workflow.workflow_length} этап(а)`}
+													primaryTypographyProps={{ fontWeight: 500 }}
+													/>
+													<ListItemSecondaryAction>
+													<Tooltip title='Редактировать шаблон'>
+														<IconButton
+														edge='end'
+														size='small'
+														onClick={(e) => {
+															e.stopPropagation();
+															handleEditWorkflow(workflow);
+														}}
 														>
-															<ListItemIcon sx={{ minWidth: 40 }}>
-																<AccountTreeIcon
-																	color={
-																		selectedWorkflow?.id === workflow.id
-																			? 'primary'
-																			: 'action'
-																	}
-																/>
-															</ListItemIcon>
-															<ListItemText
-																primary={workflow.name}
-																secondary={`${
-																	workflow.steps?.length || 0
-																} этапов`}
-																primaryTypographyProps={{ fontWeight: 500 }}
-															/>
-															<ListItemSecondaryAction>
-																<Tooltip title='Редактировать шаблон'>
-																	<IconButton
-																		edge='end'
-																		size='small'
-																		onClick={e => {
-																			e.stopPropagation();
-																			handleEditWorkflow(workflow);
-																		}}
-																	>
-																		<EditIcon fontSize='small' />
-																	</IconButton>
-																</Tooltip>
-															</ListItemSecondaryAction>
-														</ListItem>
-													))}
-												</List>
+														<EditIcon fontSize='small' />
+														</IconButton>
+													</Tooltip>
+													</ListItemSecondaryAction>
+												</ListItem>
+												))}
+																						</List>
 											) : (
 												<Box sx={{ p: 3, textAlign: 'center' }}>
 													<Typography color='text.secondary'>
