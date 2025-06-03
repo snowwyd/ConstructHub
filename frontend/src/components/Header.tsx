@@ -4,7 +4,6 @@ import BuildCircleIcon from '@mui/icons-material/BuildCircle';
 import DesignServicesIcon from '@mui/icons-material/DesignServices';
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
-import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
 import {

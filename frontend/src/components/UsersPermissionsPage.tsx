@@ -24,15 +24,13 @@ import {
 	DialogTitle,
 	Divider,
 	FormControl,
-	FormControlLabel,
-	Grid,
+	Grid2 as Grid,
 	IconButton,
 	InputLabel,
 	MenuItem,
 	Paper,
 	Select,
 	Snackbar,
-	Switch,
 	Tab,
 	Tabs,
 	TextField,
@@ -42,52 +40,36 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
-import { axiosFetching, axiosFetchingFiles } from '../api/AxiosFetch';
+import { axiosFetching } from '../api/AxiosFetch';
 import config from '../constants/Configurations.json';
 import ErrorState from './ErrorState';
-import FileAccessManager from './FileAccessManager';
+import FileAccessManager from './FileAccessManager'; // ВАЖНО: Возвращаем импорт!
 import LoadingState from './LoadingState';
 
 // Интерфейсы для типизации данных
 interface User {
-	id: number;
+	user_id: number;
 	login: string;
-	role_id: number;
-	role_name: string;
-	created_at: string;
-	updated_at: string;
+	role_id?: number;
+	role_name?: string;
+	created_at?: string;
+	updated_at?: string;
 }
 
 interface Role {
-	id: number;
-	name: string;
-	description: string;
-	permissions: string[];
-	created_at: string;
-	updated_at: string;
+	role_id: number;
+	role_name: string;
+	description?: string;
+	permissions?: string[];
+	created_at?: string;
+	updated_at?: string;
 }
 
-interface Directory {
-	id: number;
-	name_folder: string;
-	status: string;
-	parent_path_id?: number | null;
+interface UsersByRole {
+	role_name: string;
+	users: User[];
 }
 
-interface UserAccess {
-	id: number;
-	user_id: number;
-	user_login?: string;
-	directory_id: number;
-	directory_name?: string;
-	can_read: boolean;
-	can_write: boolean;
-	can_delete: boolean;
-	created_at: string;
-	updated_at: string;
-}
-
-// Списки доступных прав для ролей
 const availablePermissions = [
 	{ id: 'view_files', name: 'Просмотр файлов' },
 	{ id: 'edit_files', name: 'Редактирование файлов' },
@@ -99,14 +81,6 @@ const availablePermissions = [
 	{ id: 'manage_workflows', name: 'Управление процессами согласования' },
 	{ id: 'view_admin', name: 'Доступ к панели администратора' },
 ];
-
-// Эндпоинты
-const getUsersAccess = config.getUserAccess || '/admin/users/1/tree';
-const updateUserAccess =
-	config.updateUserAccess || '/admin/users/:user_id/tree';
-const createUserAccess =
-	config.createUserAccess || '/admin/users/1/tree/create';
-const deleteUserAccess = config.deleteUserAccess || '/admin/users/1/tree';
 
 const UsersPermissionsPage = () => {
 	const theme = useTheme();
@@ -142,38 +116,16 @@ const UsersPermissionsPage = () => {
 	const [deleteRoleDialogOpen, setDeleteRoleDialogOpen] = useState(false);
 	const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
 
-	// Состояние для назначения доступа к директориям
-	const [accessDialogOpen, setAccessDialogOpen] = useState(false);
-	const [accessFormData, setAccessFormData] = useState<{
-		id: number;
-		userId: number | null;
-		directoryId: number | null;
-		canRead: boolean;
-		canWrite: boolean;
-		canDelete: boolean;
-	}>({
-		id: 0,
-		userId: null,
-		directoryId: null,
-		canRead: true,
-		canWrite: false,
-		canDelete: false,
-	});
-	const [isEditingAccess, setIsEditingAccess] = useState(false);
-	const [deleteAccessDialogOpen, setDeleteAccessDialogOpen] = useState(false);
-	const [accessToDelete, setAccessToDelete] = useState<UserAccess | null>(null);
-	const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-
 	// Запросы к API для получения пользователей
 	const {
-		data: users,
+		data: usersData,
 		isLoading: isUsersLoading,
 		isError: isUsersError,
 		refetch: refetchUsers,
 	} = useQuery({
 		queryKey: ['admin', 'users'],
 		queryFn: async () => {
-			const response = await axiosFetching.get('/admin/users');
+			const response = await axiosFetching.get(config.getUsers || '/admin/users');
 			return response.data;
 		},
 	});
@@ -187,44 +139,28 @@ const UsersPermissionsPage = () => {
 	} = useQuery({
 		queryKey: ['admin', 'roles'],
 		queryFn: async () => {
-			const response = await axiosFetching.get('/admin/roles');
+			const response = await axiosFetching.get(config.getRoles || '/admin/roles');
 			return response.data;
 		},
 	});
 
-	// Запросы к API для получения директорий
-	const {
-		data: directories,
-		isLoading: isDirectoriesLoading,
-		refetch: refetchDirectories,
-	} = useQuery({
-		queryKey: ['admin', 'directories'],
-		queryFn: async () => {
-			const response = await axiosFetchingFiles.post('/directories', {
-				is_archive: false,
+	// Преобразуем данные пользователей из формата "по ролям" в плоский массив
+	const users = React.useMemo(() => {
+		if (!usersData || !Array.isArray(usersData)) return [];
+		
+		const flatUsers: User[] = [];
+		usersData.forEach((roleGroup: UsersByRole) => {
+			roleGroup.users.forEach((user) => {
+				flatUsers.push({
+					...user,
+					role_name: roleGroup.role_name,
+					// Находим role_id по role_name
+					role_id: roles?.find((r: Role) => r.role_name === roleGroup.role_name)?.role_id,
+				});
 			});
-			return response.data;
-		},
-	});
-
-	// Запросы к API для получения доступов пользователей
-	const {
-		data: userAccess,
-		isLoading: isUserAccessLoading,
-		isError: isUserAccessError,
-		refetch: refetchUserAccess,
-	} = useQuery({
-		queryKey: ['admin', 'userAccess', selectedUserId],
-		queryFn: async () => {
-			// Если выбран конкретный пользователь, получаем только его доступы
-			const url = selectedUserId
-				? `${getUsersAccess}/${selectedUserId}`
-				: getUsersAccess;
-			const response = await axiosFetchingFiles.get(url);
-			return response.data;
-		},
-		enabled: activeTab === 2, // Запрашиваем только когда активна вкладка с доступами
-	});
+		});
+		return flatUsers;
+	}, [usersData, roles]);
 
 	// Мутации для пользователей
 	const createUserMutation = useMutation({
@@ -234,7 +170,7 @@ const UsersPermissionsPage = () => {
 			role_id: number;
 		}) => {
 			const response = await axiosFetching.post(
-				'/admin/users/register',
+				config.createUser || '/admin/users/register',
 				userData
 			);
 			return response.data;
@@ -269,10 +205,8 @@ const UsersPermissionsPage = () => {
 			userId: number;
 			userData: { login?: string; password?: string; role_id?: number };
 		}) => {
-			const response = await axiosFetching.put(
-				`/admin/users/${userId}`,
-				userData
-			);
+			const url = (config.updateUser || '/admin/users/:user_id').replace(':user_id', userId.toString());
+			const response = await axiosFetching.put(url, userData);
 			return response.data;
 		},
 		onSuccess: () => {
@@ -299,8 +233,8 @@ const UsersPermissionsPage = () => {
 
 	const deleteUserMutation = useMutation({
 		mutationFn: async (userId: number) => {
-			const response = await axiosFetching.delete('/admin/users', {
-				data: { id: userId },
+			const response = await axiosFetching.delete(config.deleteUser || '/admin/users', {
+				data: { user_id: userId }, // Используем user_id вместо id
 			});
 			return response.data;
 		},
@@ -329,11 +263,11 @@ const UsersPermissionsPage = () => {
 	// Мутации для ролей
 	const createRoleMutation = useMutation({
 		mutationFn: async (roleData: {
-			name: string;
-			description: string;
-			permissions: string[];
+			role_name: string;
+			description?: string;
+			permissions?: string[];
 		}) => {
-			const response = await axiosFetching.post('/admin/roles', roleData);
+			const response = await axiosFetching.post(config.createRole || '/admin/roles', roleData);
 			return response.data;
 		},
 		onSuccess: () => {
@@ -364,12 +298,10 @@ const UsersPermissionsPage = () => {
 			roleData,
 		}: {
 			roleId: number;
-			roleData: { name?: string; description?: string; permissions?: string[] };
+			roleData: { role_name?: string; description?: string; permissions?: string[] };
 		}) => {
-			const response = await axiosFetching.put(
-				`/admin/roles/${roleId}`,
-				roleData
-			);
+			const url = (config.updateRole || '/admin/roles/:role_id').replace(':role_id', roleId.toString());
+			const response = await axiosFetching.put(url, roleData);
 			return response.data;
 		},
 		onSuccess: () => {
@@ -396,8 +328,8 @@ const UsersPermissionsPage = () => {
 
 	const deleteRoleMutation = useMutation({
 		mutationFn: async (roleId: number) => {
-			const response = await axiosFetching.delete('/admin/roles', {
-				data: { id: roleId },
+			const response = await axiosFetching.delete(config.deleteRole || '/admin/roles', {
+				data: { role_id: roleId }, // Используем role_id вместо id
 			});
 			return response.data;
 		},
@@ -423,122 +355,9 @@ const UsersPermissionsPage = () => {
 		},
 	});
 
-	// Мутации для доступа пользователей
-	const createUserAccessMutation = useMutation({
-		mutationFn: async (accessData: {
-			user_id: number;
-			directory_id: number;
-			can_read: boolean;
-			can_write: boolean;
-			can_delete: boolean;
-		}) => {
-			const response = await axiosFetching.post(createUserAccess, accessData);
-			return response.data;
-		},
-		onSuccess: () => {
-			setSnackbar({
-				open: true,
-				message: 'Доступ успешно назначен',
-				severity: 'success',
-			});
-			queryClient.invalidateQueries({ queryKey: ['admin', 'userAccess'] });
-			setAccessDialogOpen(false);
-			resetAccessForm();
-		},
-		onError: (error: any) => {
-			console.error('Error creating user access:', error);
-			setSnackbar({
-				open: true,
-				message: `Ошибка при назначении доступа: ${
-					error.response?.data?.message || error.message
-				}`,
-				severity: 'error',
-			});
-		},
-	});
-
-	const updateUserAccessMutation = useMutation({
-		mutationFn: async ({
-			accessId,
-			accessData,
-		}: {
-			accessId: number;
-			accessData: {
-				user_id: number;
-				directory_id: number;
-				can_read: boolean;
-				can_write: boolean;
-				can_delete: boolean;
-			};
-		}) => {
-			const url = updateUserAccess.replace(
-				':user_id',
-				accessData.user_id.toString()
-			);
-			const response = await axiosFetching.put(
-				`${url}/${accessId}`,
-				accessData
-			);
-			return response.data;
-		},
-		onSuccess: () => {
-			setSnackbar({
-				open: true,
-				message: 'Доступ успешно обновлен',
-				severity: 'success',
-			});
-			queryClient.invalidateQueries({ queryKey: ['admin', 'userAccess'] });
-			setAccessDialogOpen(false);
-			resetAccessForm();
-		},
-		onError: (error: any) => {
-			console.error('Error updating user access:', error);
-			setSnackbar({
-				open: true,
-				message: `Ошибка при обновлении доступа: ${
-					error.response?.data?.message || error.message
-				}`,
-				severity: 'error',
-			});
-		},
-	});
-
-	const deleteUserAccessMutation = useMutation({
-		mutationFn: async (accessId: number) => {
-			const response = await axiosFetching.delete(deleteUserAccess, {
-				data: { id: accessId },
-			});
-			return response.data;
-		},
-		onSuccess: () => {
-			setSnackbar({
-				open: true,
-				message: 'Доступ успешно удален',
-				severity: 'success',
-			});
-			queryClient.invalidateQueries({ queryKey: ['admin', 'userAccess'] });
-			setDeleteAccessDialogOpen(false);
-			setAccessToDelete(null);
-		},
-		onError: (error: any) => {
-			console.error('Error deleting user access:', error);
-			setSnackbar({
-				open: true,
-				message: `Ошибка при удалении доступа: ${
-					error.response?.data?.message || error.message
-				}`,
-				severity: 'error',
-			});
-		},
-	});
-
 	// Вспомогательные функции
 	const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
 		setActiveTab(newValue);
-		if (newValue === 2) {
-			// Загружаем данные при переключении на вкладку управления доступом
-			refetchUserAccess();
-		}
 	};
 
 	const resetUserForm = () => {
@@ -551,18 +370,6 @@ const UsersPermissionsPage = () => {
 		setIsEditingRole(false);
 	};
 
-	const resetAccessForm = () => {
-		setAccessFormData({
-			id: 0,
-			userId: null,
-			directoryId: null,
-			canRead: true,
-			canWrite: false,
-			canDelete: false,
-		});
-		setIsEditingAccess(false);
-	};
-
 	const handleCreateUser = () => {
 		setIsEditingUser(false);
 		resetUserForm();
@@ -572,10 +379,10 @@ const UsersPermissionsPage = () => {
 	const handleEditUser = (user: User) => {
 		setIsEditingUser(true);
 		setUserFormData({
-			id: user.id,
+			id: user.user_id,
 			login: user.login,
 			password: '', // Не заполняем пароль при редактировании
-			roleId: user.role_id,
+			roleId: user.role_id || 0,
 		});
 		setUserDialogOpen(true);
 	};
@@ -594,8 +401,8 @@ const UsersPermissionsPage = () => {
 	const handleEditRole = (role: Role) => {
 		setIsEditingRole(true);
 		setRoleFormData({
-			id: role.id,
-			name: role.name,
+			id: role.role_id,
+			name: role.role_name,
 			description: role.description || '',
 			permissions: role.permissions || [],
 		});
@@ -605,30 +412,6 @@ const UsersPermissionsPage = () => {
 	const handleDeleteRole = (role: Role) => {
 		setRoleToDelete(role);
 		setDeleteRoleDialogOpen(true);
-	};
-
-	const handleCreateAccess = () => {
-		setIsEditingAccess(false);
-		resetAccessForm();
-		setAccessDialogOpen(true);
-	};
-
-	const handleEditAccess = (access: UserAccess) => {
-		setIsEditingAccess(true);
-		setAccessFormData({
-			id: access.id,
-			userId: access.user_id,
-			directoryId: access.directory_id,
-			canRead: access.can_read,
-			canWrite: access.can_write,
-			canDelete: access.can_delete,
-		});
-		setAccessDialogOpen(true);
-	};
-
-	const handleDeleteAccess = (access: UserAccess) => {
-		setAccessToDelete(access);
-		setDeleteAccessDialogOpen(true);
 	};
 
 	const submitUserForm = () => {
@@ -659,87 +442,33 @@ const UsersPermissionsPage = () => {
 			updateRoleMutation.mutate({
 				roleId: roleFormData.id,
 				roleData: {
-					name: roleFormData.name,
+					role_name: roleFormData.name,
 					description: roleFormData.description,
 					permissions: roleFormData.permissions,
 				},
 			});
 		} else {
 			createRoleMutation.mutate({
-				name: roleFormData.name,
+				role_name: roleFormData.name,
 				description: roleFormData.description,
 				permissions: roleFormData.permissions,
 			});
 		}
 	};
 
-	// Функция для извлечения всех логинов
-	const extractLogins = (usersData: any[]): string[] => {
-		if (!Array.isArray(usersData)) return [];
-
-		// Проходим по каждой роли и собираем логины из users
-		return usersData.flatMap((role) =>
-			Array.isArray(role.users)
-			? role.users.map((user: any) => user.login)
-			: []
-		);
-	};
-
-		// Использование в компоненте
-	const logins = users ? extractLogins(users) : [];
-
-	const submitAccessForm = () => {
-		if (!accessFormData.userId || !accessFormData.directoryId) {
-			setSnackbar({
-				open: true,
-				message: 'Необходимо выбрать пользователя и директорию',
-				severity: 'error',
-			});
-			return;
-		}
-
-		if (isEditingAccess) {
-			updateUserAccessMutation.mutate({
-				accessId: accessFormData.id,
-				accessData: {
-					user_id: accessFormData.userId,
-					directory_id: accessFormData.directoryId,
-					can_read: accessFormData.canRead,
-					can_write: accessFormData.canWrite,
-					can_delete: accessFormData.canDelete,
-				},
-			});
-		} else {
-			createUserAccessMutation.mutate({
-				user_id: accessFormData.userId,
-				directory_id: accessFormData.directoryId,
-				can_read: accessFormData.canRead,
-				can_write: accessFormData.canWrite,
-				can_delete: accessFormData.canDelete,
-			});
-		}
-	};
-
 	const confirmDeleteUser = () => {
 		if (userToDelete) {
-			deleteUserMutation.mutate(userToDelete.id);
+			deleteUserMutation.mutate(userToDelete.user_id);
 		}
 	};
 
 	const confirmDeleteRole = () => {
 		if (roleToDelete) {
-			deleteRoleMutation.mutate(roleToDelete.id);
-		}
-	};
-
-	const confirmDeleteAccess = () => {
-		if (accessToDelete) {
-			deleteUserAccessMutation.mutate(accessToDelete.id);
+			deleteRoleMutation.mutate(roleToDelete.role_id);
 		}
 	};
 
 	const handlePermissionToggle = (permission: string) => {
-		// Безопасно проверяем наличие разрешения в массиве permissions
 		const currentPermissions = roleFormData.permissions || [];
 
 		if (currentPermissions.includes(permission)) {
@@ -755,48 +484,26 @@ const UsersPermissionsPage = () => {
 		}
 	};
 
-	// Функция для получения имени пользователя
-	const getUserName = (userId: number) => {
-		if (!users) return 'Неизвестный пользователь';
-		const user = users.find((u: User) => u.id === userId);
-		return user ? user.login : 'Неизвестный пользователь';
-	};
-
-	// Функция для получения имени директории
-	const getDirectoryName = (directoryId: number) => {
-		if (!directories || !directories.data) return 'Неизвестная директория';
-		const directory = directories.data.find(
-			(d: Directory) => d.id === directoryId
-		);
-		return directory ? directory.name_folder : 'Неизвестная директория';
-	};
-
 	// Проверка на загрузку и ошибки
 	if (
 		(activeTab === 0 && isUsersLoading) ||
-		(activeTab === 1 && isRolesLoading) ||
-		(activeTab === 2 && isUserAccessLoading)
+		(activeTab === 1 && isRolesLoading)
 	) {
 		const loadingMessage =
 			activeTab === 0
 				? 'Загрузка пользователей...'
-				: activeTab === 1
-				? 'Загрузка ролей...'
-				: 'Загрузка прав доступа...';
+				: 'Загрузка ролей...';
 		return <LoadingState message={loadingMessage} />;
 	}
 
 	if (
 		(activeTab === 0 && isUsersError) ||
-		(activeTab === 1 && isRolesError) ||
-		(activeTab === 2 && isUserAccessError)
+		(activeTab === 1 && isRolesError)
 	) {
 		const retryFunction =
 			activeTab === 0
 				? refetchUsers
-				: activeTab === 1
-				? refetchRoles
-				: refetchUserAccess;
+				: refetchRoles;
 		return <ErrorState onRetry={retryFunction} />;
 	}
 
@@ -897,94 +604,106 @@ const UsersPermissionsPage = () => {
 							</Box>
 
 							<Divider sx={{ my: 2 }} />
-							
+
 							{users && Array.isArray(users) && users.length > 0 ? (
-							<Grid container spacing={2}>
-								{users.flatMap((role: any) =>
-								role.users.map((user: User, index: number) => (
-									<Grid item xs={12} md={6} lg={4} key={`${role.role_name}-${user.id}-${index}`}>
-									<Paper
-										elevation={1}
-										sx={{
-										p: 2,
-										borderRadius: 2,
-										border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-										transition: 'all 0.2s',
-										'&:hover': {
-											boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.1)}`,
-										},
-										}}
-									>
-										<Box
-										sx={{
-											display: 'flex',
-											justifyContent: 'space-between',
-											alignItems: 'center',
-											mb: 1,
-										}}
-										>
-										<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-											<PersonOutline color='primary' />
-											<Typography variant='subtitle1' fontWeight={600}>
-											{user.login}
-											</Typography>
-										</Box>
-										<Box>
-											<Tooltip title='Редактировать'>
-											<IconButton
-												size='small'
-												color='primary'
-												onClick={() => handleEditUser(user)}
+								<Grid container spacing={2}>
+									{users.map((user: User) => (
+										<Grid size={{ xs: 12, md: 6, lg: 4 }} key={user.user_id}>
+											<Paper
+												elevation={1}
+												sx={{
+													p: 2,
+													borderRadius: 2,
+													border: `1px solid ${alpha(
+														theme.palette.divider,
+														0.1
+													)}`,
+													transition: 'all 0.2s',
+													'&:hover': {
+														boxShadow: `0 4px 12px ${alpha(
+															theme.palette.primary.main,
+															0.1
+														)}`,
+													},
+												}}
 											>
-												<EditIcon fontSize='small' />
-											</IconButton>
-											</Tooltip>
-											<Tooltip title='Удалить'>
-											<IconButton
-												size='small'
-												color='error'
-												onClick={() => handleDeleteUser(user)}
-											>
-												<DeleteIcon fontSize='small' />
-											</IconButton>
-											</Tooltip>
-										</Box>
-										</Box>
-										<Box sx={{ mt: 1 }}>
-										<Chip
-											icon={<AdminPanelSettings fontSize='small' />}
-											label={role.role_name || 'Без роли'}
-											size='small'
-											color={role.role_name === 'admin' ? 'primary' : 'default'}
-											variant='outlined'
-										/>
-										</Box>
-										<Typography
-										variant='caption'
-										color='text.secondary'
-										sx={{ display: 'block', mt: 1 }}
-										>
-										ID: {user.id} • Создан:{' '}
-										{new Date(user.created_at).toLocaleDateString()}
-										</Typography>
-									</Paper>
-									</Grid>
-								))
-								)}
-							</Grid>
+												<Box
+													sx={{
+														display: 'flex',
+														justifyContent: 'space-between',
+														alignItems: 'center',
+														mb: 1,
+													}}
+												>
+													<Box
+														sx={{
+															display: 'flex',
+															alignItems: 'center',
+															gap: 1,
+														}}
+													>
+														<PersonOutline color='primary' />
+														<Typography variant='subtitle1' fontWeight={600}>
+															{user.login}
+														</Typography>
+													</Box>
+													<Box>
+														<Tooltip title='Редактировать'>
+															<IconButton
+																size='small'
+																color='primary'
+																onClick={() => handleEditUser(user)}
+															>
+																<EditIcon fontSize='small' />
+															</IconButton>
+														</Tooltip>
+														<Tooltip title='Удалить'>
+															<IconButton
+																size='small'
+																color='error'
+																onClick={() => handleDeleteUser(user)}
+															>
+																<DeleteIcon fontSize='small' />
+															</IconButton>
+														</Tooltip>
+													</Box>
+												</Box>
+												<Box sx={{ mt: 1 }}>
+													<Chip
+														icon={<AdminPanelSettings fontSize='small' />}
+														label={user.role_name || 'Без роли'}
+														size='small'
+														color={
+															user.role_name === 'admin' ? 'primary' : 'default'
+														}
+														variant='outlined'
+													/>
+												</Box>
+												<Typography
+													variant='caption'
+													color='text.secondary'
+													sx={{ display: 'block', mt: 1 }}
+												>
+													ID: {user.user_id}
+													{user.created_at && ` • Создан: ${new Date(user.created_at).toLocaleDateString()}`}
+												</Typography>
+											</Paper>
+										</Grid>
+									))}
+								</Grid>
 							) : (
-							<Box sx={{ textAlign: 'center', py: 4 }}>
-								<PersonOutline
-								sx={{
-									fontSize: 60,
-									color: alpha(theme.palette.text.secondary, 0.2),
-									mb: 2,
-								}}
-								/>
-								<Typography color='text.secondary'>
-								Список пользователей пуст
-								</Typography>
-							</Box>
+								<Box sx={{ textAlign: 'center', py: 4 }}>
+									<PersonOutline
+										sx={{
+											fontSize: 60,
+											color: alpha(theme.palette.text.secondary, 0.2),
+											mb: 2,
+										}}
+									/>
+									<Typography color='text.secondary'>
+										Список пользователей пуст
+									</Typography>
+								</Box>
 							)}
 						</Box>
 					)}
@@ -1023,7 +742,7 @@ const UsersPermissionsPage = () => {
 							{roles && Array.isArray(roles) && roles.length > 0 ? (
 								<Grid container spacing={2}>
 									{roles.map((role: Role) => (
-										<Grid item xs={12} md={6} key={role.id}>
+										<Grid size={{ xs: 12, md: 6 }} key={role.role_id}>
 											<Paper
 												elevation={1}
 												sx={{
@@ -1059,7 +778,7 @@ const UsersPermissionsPage = () => {
 													>
 														<ManageAccountsOutlined color='primary' />
 														<Typography variant='subtitle1' fontWeight={600}>
-															{role.name}
+															{role.role_name}
 														</Typography>
 													</Box>
 													<Box>
@@ -1077,7 +796,7 @@ const UsersPermissionsPage = () => {
 																size='small'
 																color='error'
 																onClick={() => handleDeleteRole(role)}
-																disabled={role.name === 'admin'} // Защита от удаления роли admin
+																disabled={role.role_name === 'admin'}
 															>
 																<DeleteIcon fontSize='small' />
 															</IconButton>
@@ -1090,7 +809,7 @@ const UsersPermissionsPage = () => {
 													color='text.secondary'
 													sx={{ mb: 2 }}
 												>
-													{role.description}
+													{role.description || 'Описание не задано'}
 												</Typography>
 
 												<Typography variant='subtitle2' sx={{ mb: 1 }}>
@@ -1104,7 +823,7 @@ const UsersPermissionsPage = () => {
 															);
 															return (
 																<Chip
-																	key={`${role.id}-${permission}-${index}`}
+																	key={`${role.role_id}-${permission}-${index}`}
 																	label={permInfo ? permInfo.name : permission}
 																	size='small'
 																	color='primary'
@@ -1125,8 +844,8 @@ const UsersPermissionsPage = () => {
 													color='text.secondary'
 													sx={{ display: 'block', mt: 2 }}
 												>
-													ID: {role.id} • Создана:{' '}
-													{new Date(role.created_at).toLocaleDateString()}
+													ID: {role.role_id}
+													{role.created_at && ` • Создана: ${new Date(role.created_at).toLocaleDateString()}`}
 												</Typography>
 											</Paper>
 										</Grid>
@@ -1134,7 +853,7 @@ const UsersPermissionsPage = () => {
 								</Grid>
 							) : (
 								<Box sx={{ textAlign: 'center', py: 4 }}>
-									<SecurityOutlined
+									<ManageAccountsOutlined
 										sx={{
 											fontSize: 60,
 											color: alpha(theme.palette.text.secondary, 0.2),
@@ -1149,11 +868,12 @@ const UsersPermissionsPage = () => {
 						</Box>
 					)}
 
-					{/* Таб управления доступом к директориям */}
+					{/* Таб управления доступом к директориям - ВОЗВРАЩАЕМ ОРИГИНАЛЬНЫЙ КОМПОНЕНТ */}
 					{activeTab === 2 && <FileAccessManager />}
 				</Box>
 			</Paper>
 
+			{/* Остальные диалоги остаются без изменений... */}
 			{/* Диалог создания/редактирования пользователя */}
 			<Dialog
 				open={userDialogOpen}
@@ -1189,7 +909,7 @@ const UsersPermissionsPage = () => {
 				<Divider />
 				<DialogContent sx={{ pt: 3 }}>
 					<Grid container spacing={2}>
-						<Grid item xs={12}>
+						<Grid size={12}>
 							<TextField
 								fullWidth
 								label='Логин'
@@ -1201,7 +921,7 @@ const UsersPermissionsPage = () => {
 								required
 							/>
 						</Grid>
-						<Grid item xs={12}>
+						<Grid size={12}>
 							<TextField
 								fullWidth
 								label={
@@ -1218,7 +938,7 @@ const UsersPermissionsPage = () => {
 								required={!isEditingUser}
 							/>
 						</Grid>
-						<Grid item xs={12}>
+						<Grid size={12}>
 							<FormControl fullWidth variant='outlined'>
 								<InputLabel>Роль</InputLabel>
 								<Select
@@ -1235,10 +955,10 @@ const UsersPermissionsPage = () => {
 									<MenuItem value=''>
 										<em>Выберите роль</em>
 									</MenuItem>
-									{roles &&
+									{roles && Array.isArray(roles) &&
 										roles.map((role: Role) => (
-											<MenuItem key={role.id} value={role.id}>
-												{role.name}
+											<MenuItem key={role.role_id} value={role.role_id}>
+												{role.role_name}
 											</MenuItem>
 										))}
 								</Select>
@@ -1363,7 +1083,7 @@ const UsersPermissionsPage = () => {
 						alignItems='center'
 					>
 						<Box display='flex' alignItems='center' gap={1}>
-							<SecurityOutlined color='primary' />
+							<ManageAccountsOutlined color='primary' />
 							<Typography variant='h6' fontWeight={600}>
 								{isEditingRole ? 'Редактирование роли' : 'Добавление роли'}
 							</Typography>
@@ -1376,7 +1096,7 @@ const UsersPermissionsPage = () => {
 				<Divider />
 				<DialogContent sx={{ pt: 3 }}>
 					<Grid container spacing={3}>
-						<Grid item xs={12}>
+						<Grid size={12}>
 							<TextField
 								fullWidth
 								label='Название роли'
@@ -1386,10 +1106,10 @@ const UsersPermissionsPage = () => {
 								}
 								variant='outlined'
 								required
-								disabled={isEditingRole && roleFormData.name === 'admin'} // Не даем изменить имя роли admin
+								disabled={isEditingRole && roleFormData.name === 'admin'}
 							/>
 						</Grid>
-						<Grid item xs={12}>
+						<Grid size={12}>
 							<TextField
 								fullWidth
 								label='Описание'
@@ -1405,7 +1125,7 @@ const UsersPermissionsPage = () => {
 								rows={2}
 							/>
 						</Grid>
-						<Grid item xs={12}>
+						<Grid size={12}>
 							<Typography variant='subtitle2' sx={{ mb: 2 }}>
 								Права доступа:
 							</Typography>
@@ -1498,7 +1218,7 @@ const UsersPermissionsPage = () => {
 				<DialogContent sx={{ pt: 3 }}>
 					<Typography variant='body1'>
 						Вы действительно хотите удалить роль{' '}
-						<strong>{roleToDelete?.name}</strong>?
+						<strong>{roleToDelete?.role_name}</strong>?
 					</Typography>
 					<Typography variant='body2' color='error' sx={{ mt: 1 }}>
 						Внимание! Все пользователи с этой ролью потеряют свои права доступа.
@@ -1522,259 +1242,10 @@ const UsersPermissionsPage = () => {
 						color='error'
 						disabled={
 							deleteRoleMutation.isPending ||
-							(roleToDelete && roleToDelete.name === 'admin')
+							roleToDelete?.role_name === 'admin'
 						}
 						startIcon={
 							deleteRoleMutation.isPending ? (
-								<CircularProgress size={16} color='inherit' />
-							) : null
-						}
-						sx={{ borderRadius: 2 }}
-					>
-						Удалить
-					</Button>
-				</DialogActions>
-			</Dialog>
-
-			{/* Диалог создания/редактирования доступа */}
-			<Dialog
-				open={accessDialogOpen}
-				onClose={() => setAccessDialogOpen(false)}
-				maxWidth='sm'
-				fullWidth
-				PaperProps={{
-					sx: {
-						borderRadius: 3,
-						boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}`,
-					},
-				}}
-			>
-				<DialogTitle sx={{ pb: 2 }}>
-					<Box
-						display='flex'
-						justifyContent='space-between'
-						alignItems='center'
-					>
-						<Box display='flex' alignItems='center' gap={1}>
-							<FolderOutlined color='primary' />
-							<Typography variant='h6' fontWeight={600}>
-								{isEditingAccess
-									? 'Редактирование доступа'
-									: 'Назначение доступа к директории'}
-							</Typography>
-						</Box>
-						<IconButton onClick={() => setAccessDialogOpen(false)}>
-							<CloseIcon />
-						</IconButton>
-					</Box>
-				</DialogTitle>
-				<Divider />
-				<DialogContent sx={{ pt: 3 }}>
-					<Grid container spacing={2}>
-						<Grid item xs={12}>
-							<FormControl fullWidth variant='outlined' required>
-								<InputLabel>Пользователь</InputLabel>
-								<Select
-									value={accessFormData.userId || ''}
-									onChange={e =>
-										setAccessFormData({
-											...accessFormData,
-											userId: e.target.value ? Number(e.target.value) : null,
-										})
-									}
-									label='Пользователь'
-									disabled={isEditingAccess} // Нельзя менять пользователя при редактировании
-								>
-									<MenuItem value=''>
-										<em>Выберите пользователя</em>
-									</MenuItem>
-									{users &&
-										users.map((user: User) => (
-											<MenuItem key={user.id} value={user.id}>
-												{user.login}{' '}
-												{user.role_name ? `(${user.role_name})` : ''}
-											</MenuItem>
-										))}
-								</Select>
-							</FormControl>
-						</Grid>
-						<Grid item xs={12}>
-							<FormControl fullWidth variant='outlined' required>
-								<InputLabel>Директория</InputLabel>
-								<Select
-									value={accessFormData.directoryId || ''}
-									onChange={e =>
-										setAccessFormData({
-											...accessFormData,
-											directoryId: e.target.value
-												? Number(e.target.value)
-												: null,
-										})
-									}
-									label='Директория'
-									disabled={isEditingAccess} // Нельзя менять директорию при редактировании
-								>
-									<MenuItem value=''>
-										<em>Выберите директорию</em>
-									</MenuItem>
-									{directories &&
-										directories.data &&
-										directories.data.map((dir: Directory) => (
-											<MenuItem key={dir.id} value={dir.id}>
-												{dir.name_folder}
-											</MenuItem>
-										))}
-								</Select>
-							</FormControl>
-						</Grid>
-						<Grid item xs={12}>
-							<Typography variant='subtitle2' gutterBottom>
-								Права доступа:
-							</Typography>
-							<FormControlLabel
-								control={
-									<Switch
-										checked={accessFormData.canRead}
-										onChange={e =>
-											setAccessFormData({
-												...accessFormData,
-												canRead: e.target.checked,
-											})
-										}
-										color='primary'
-									/>
-								}
-								label='Чтение'
-							/>
-							<FormControlLabel
-								control={
-									<Switch
-										checked={accessFormData.canWrite}
-										onChange={e =>
-											setAccessFormData({
-												...accessFormData,
-												canWrite: e.target.checked,
-											})
-										}
-										color='primary'
-									/>
-								}
-								label='Запись'
-							/>
-							<FormControlLabel
-								control={
-									<Switch
-										checked={accessFormData.canDelete}
-										onChange={e =>
-											setAccessFormData({
-												...accessFormData,
-												canDelete: e.target.checked,
-											})
-										}
-										color='primary'
-									/>
-								}
-								label='Удаление'
-							/>
-						</Grid>
-					</Grid>
-				</DialogContent>
-				<Divider />
-				<DialogActions sx={{ p: 2 }}>
-					<Button
-						onClick={() => setAccessDialogOpen(false)}
-						variant='outlined'
-						sx={{ borderRadius: 2 }}
-					>
-						Отмена
-					</Button>
-					<Button
-						onClick={submitAccessForm}
-						variant='contained'
-						disabled={
-							!accessFormData.userId ||
-							!accessFormData.directoryId ||
-							createUserAccessMutation.isPending ||
-							updateUserAccessMutation.isPending
-						}
-						startIcon={
-							createUserAccessMutation.isPending ||
-							updateUserAccessMutation.isPending ? (
-								<CircularProgress size={16} color='inherit' />
-							) : null
-						}
-						sx={{ borderRadius: 2 }}
-					>
-						{isEditingAccess ? 'Сохранить' : 'Назначить'}
-					</Button>
-				</DialogActions>
-			</Dialog>
-
-			{/* Диалог подтверждения удаления доступа */}
-			<Dialog
-				open={deleteAccessDialogOpen}
-				onClose={() => setDeleteAccessDialogOpen(false)}
-				maxWidth='xs'
-				fullWidth
-				PaperProps={{
-					sx: {
-						borderRadius: 3,
-						boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}`,
-					},
-				}}
-			>
-				<DialogTitle sx={{ pb: 2 }}>
-					<Box
-						display='flex'
-						justifyContent='space-between'
-						alignItems='center'
-					>
-						<Box display='flex' alignItems='center' gap={1}>
-							<DeleteIcon color='error' />
-							<Typography variant='h6' fontWeight={600}>
-								Удаление доступа
-							</Typography>
-						</Box>
-						<IconButton onClick={() => setDeleteAccessDialogOpen(false)}>
-							<CloseIcon />
-						</IconButton>
-					</Box>
-				</DialogTitle>
-				<Divider />
-				<DialogContent sx={{ pt: 3 }}>
-					<Typography variant='body1'>
-						Вы действительно хотите удалить доступ пользователя{' '}
-						<strong>
-							{accessToDelete ? getUserName(accessToDelete.user_id) : ''}
-						</strong>{' '}
-						к директории{' '}
-						<strong>
-							{accessToDelete
-								? getDirectoryName(accessToDelete.directory_id)
-								: ''}
-						</strong>
-						?
-					</Typography>
-					<Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
-						Это действие невозможно отменить.
-					</Typography>
-				</DialogContent>
-				<Divider />
-				<DialogActions sx={{ p: 2 }}>
-					<Button
-						onClick={() => setDeleteAccessDialogOpen(false)}
-						variant='outlined'
-						sx={{ borderRadius: 2 }}
-					>
-						Отмена
-					</Button>
-					<Button
-						onClick={confirmDeleteAccess}
-						variant='contained'
-						color='error'
-						disabled={deleteUserAccessMutation.isPending}
-						startIcon={
-							deleteUserAccessMutation.isPending ? (
 								<CircularProgress size={16} color='inherit' />
 							) : null
 						}

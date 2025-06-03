@@ -13,5 +13,22 @@
 	"approveDocument": "/file-approvals/:approval_id/sign",
 	"sendFileToApprove": "/files/:file_id/approve",
 	"annotateDocument": "/file-approvals/:approval_id/annotate",
-	"finalizeDocument": "/file-approvals/:approval_id/finalize"
+	"finalizeDocument": "/file-approvals/:approval_id/finalize",
+	
+	"getUsers": "/admin/users",
+	"createUser": "/admin/users/register",
+	"updateUser": "/admin/users/:user_id",
+	"deleteUser": "/admin/users",
+	"assignUser": "/admin/users/:user_id/assign",
+	
+	"getRoles": "/admin/roles",
+	"getRole": "/admin/roles/:role_id",
+	"createRole": "/admin/roles",
+	"updateRole": "/admin/roles/:role_id",
+	"deleteRole": "/admin/roles",
+	
+	"getUserAccess": "/admin/users/access",
+	"createUserAccess": "/admin/users/access/create",
+	"updateUserAccess": "/admin/users/:user_id/access",
+	"deleteUserAccess": "/admin/users/access"
 }

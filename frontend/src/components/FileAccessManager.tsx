@@ -20,6 +20,7 @@ import {
 	IconButton,
 	List,
 	ListItem,
+	ListItemButton,
 	ListItemText,
 	Paper,
 	Snackbar,
@@ -182,8 +183,8 @@ const FileAccessManager = () => {
 			// По умолчанию раскрываем первый уровень директорий
 			const expanded: { [key: number]: boolean } = {};
 			directories
-				.filter(dir => !dir.parent_path_id) // Только корневые директории
-				.forEach(dir => {
+				.filter((dir: Directory) => !dir.parent_path_id) // Только корневые директории
+				.forEach((dir: Directory) => {
 					expanded[dir.directory_id] = true;
 				});
 			setExpandedDirs(expanded);
@@ -388,9 +389,13 @@ const FileAccessManager = () => {
 						/>
 						<ListItemText
 							primary={dir.name_folder}
-							primaryTypographyProps={{
-								fontWeight: isDirChecked ? 600 : 400,
-								color: isDirChecked ? 'primary' : 'inherit',
+							slotProps={{
+								primary: {
+									style: {
+										fontWeight: isDirChecked ? 600 : 400,
+										color: isDirChecked ? theme.palette.primary.main : 'inherit',
+									}
+								}
 							}}
 						/>
 					</ListItem>
@@ -435,9 +440,13 @@ const FileAccessManager = () => {
 											/>
 											<ListItemText
 												primary={file.name_file}
-												primaryTypographyProps={{
-													variant: 'body2',
-													fontWeight: isFileChecked ? 500 : 400,
+												slotProps={{
+													primary: {
+														style: {
+															fontSize: '0.875rem',
+															fontWeight: isFileChecked ? 500 : 400,
+														}
+													}
 												}}
 											/>
 										</ListItem>
@@ -545,30 +554,35 @@ const FileAccessManager = () => {
 							<List sx={{ p: 0 }}>
 								{userGroups.map(group => (
 									<Box key={group.role_name}>
-										<ListItem
-											button
-											onClick={() => handleToggleRole(group.role_name)}
-											sx={{
-												bgcolor: alpha(theme.palette.primary.main, 0.05),
-												borderBottom: `1px solid ${alpha(
-													theme.palette.divider,
-													0.05
-												)}`,
-											}}
-										>
-											<Group
-												fontSize='small'
-												sx={{ mr: 1, color: theme.palette.primary.main }}
-											/>
-											<ListItemText
-												primary={group.role_name}
-												primaryTypographyProps={{ fontWeight: 600 }}
-											/>
-											{expandedRoles[group.role_name] ? (
-												<ExpandLess />
-											) : (
-												<ExpandMore />
-											)}
+										<ListItem disablePadding>
+											<ListItemButton
+												onClick={() => handleToggleRole(group.role_name)}
+												sx={{
+													bgcolor: alpha(theme.palette.primary.main, 0.05),
+													borderBottom: `1px solid ${alpha(
+														theme.palette.divider,
+														0.05
+													)}`,
+												}}
+											>
+												<Group
+													fontSize='small'
+													sx={{ mr: 1, color: theme.palette.primary.main }}
+												/>
+												<ListItemText
+													primary={group.role_name}
+													slotProps={{
+														primary: {
+															style: { fontWeight: 600 }
+														}
+													}}
+												/>
+												{expandedRoles[group.role_name] ? (
+													<ExpandLess />
+												) : (
+													<ExpandMore />
+												)}
+											</ListItemButton>
 										</ListItem>
 										<Collapse
 											in={expandedRoles[group.role_name]}
@@ -576,30 +590,34 @@ const FileAccessManager = () => {
 											unmountOnExit
 										>
 											{group.users.map(user => (
-												<ListItem
-													key={user.user_id}
-													button
-													selected={selectedUser?.user_id === user.user_id}
-													onClick={() => handleUserSelect(user)}
-													sx={{
-														pl: 4,
-														py: 1,
-														'&.Mui-selected': {
-															bgcolor: alpha(theme.palette.primary.main, 0.12),
-															'&:hover': {
-																bgcolor: alpha(
-																	theme.palette.primary.main,
-																	0.18
-																),
+												<ListItem key={user.user_id} disablePadding>
+													<ListItemButton
+														selected={selectedUser?.user_id === user.user_id}
+														onClick={() => handleUserSelect(user)}
+														sx={{
+															pl: 4,
+															py: 1,
+															'&.Mui-selected': {
+																bgcolor: alpha(theme.palette.primary.main, 0.12),
+																'&:hover': {
+																	bgcolor: alpha(
+																		theme.palette.primary.main,
+																		0.18
+																	),
+																},
 															},
-														},
-													}}
-												>
-													<Person fontSize='small' sx={{ mr: 1 }} />
-													<ListItemText
-														primary={user.login}
-														primaryTypographyProps={{ variant: 'body2' }}
-													/>
+														}}
+													>
+														<Person fontSize='small' sx={{ mr: 1 }} />
+														<ListItemText
+															primary={user.login}
+															slotProps={{
+																primary: {
+																	style: { fontSize: '0.875rem' }
+																}
+															}}
+														/>
+													</ListItemButton>
 												</ListItem>
 											))}
 										</Collapse>
