@@ -673,6 +673,21 @@ const UsersPermissionsPage = () => {
 		}
 	};
 
+	// Функция для извлечения всех логинов
+	const extractLogins = (usersData: any[]): string[] => {
+		if (!Array.isArray(usersData)) return [];
+
+		// Проходим по каждой роли и собираем логины из users
+		return usersData.flatMap((role) =>
+			Array.isArray(role.users)
+			? role.users.map((user: any) => user.login)
+			: []
+		);
+	};
+
+		// Использование в компоненте
+	const logins = users ? extractLogins(users) : [];
+
 	const submitAccessForm = () => {
 		if (!accessFormData.userId || !accessFormData.directoryId) {
 			setSnackbar({
@@ -882,106 +897,94 @@ const UsersPermissionsPage = () => {
 							</Box>
 
 							<Divider sx={{ my: 2 }} />
-
+							
 							{users && Array.isArray(users) && users.length > 0 ? (
-								<Grid container spacing={2}>
-									{users.map((user: User) => (
-										<Grid item xs={12} md={6} lg={4} key={user.id}>
-											<Paper
-												elevation={1}
-												sx={{
-													p: 2,
-													borderRadius: 2,
-													border: `1px solid ${alpha(
-														theme.palette.divider,
-														0.1
-													)}`,
-													transition: 'all 0.2s',
-													'&:hover': {
-														boxShadow: `0 4px 12px ${alpha(
-															theme.palette.primary.main,
-															0.1
-														)}`,
-													},
-												}}
-											>
-												<Box
-													sx={{
-														display: 'flex',
-														justifyContent: 'space-between',
-														alignItems: 'center',
-														mb: 1,
-													}}
-												>
-													<Box
-														sx={{
-															display: 'flex',
-															alignItems: 'center',
-															gap: 1,
-														}}
-													>
-														<PersonOutline color='primary' />
-														<Typography variant='subtitle1' fontWeight={600}>
-															{user.login}
-														</Typography>
-													</Box>
-													<Box>
-														<Tooltip title='Редактировать'>
-															<IconButton
-																size='small'
-																color='primary'
-																onClick={() => handleEditUser(user)}
-															>
-																<EditIcon fontSize='small' />
-															</IconButton>
-														</Tooltip>
-														<Tooltip title='Удалить'>
-															<IconButton
-																size='small'
-																color='error'
-																onClick={() => handleDeleteUser(user)}
-															>
-																<DeleteIcon fontSize='small' />
-															</IconButton>
-														</Tooltip>
-													</Box>
-												</Box>
-												<Box sx={{ mt: 1 }}>
-													<Chip
-														icon={<AdminPanelSettings fontSize='small' />}
-														label={user.role_name || 'Без роли'}
-														size='small'
-														color={
-															user.role_name === 'admin' ? 'primary' : 'default'
-														}
-														variant='outlined'
-													/>
-												</Box>
-												<Typography
-													variant='caption'
-													color='text.secondary'
-													sx={{ display: 'block', mt: 1 }}
-												>
-													ID: {user.id} • Создан:{' '}
-													{new Date(user.created_at).toLocaleDateString()}
-												</Typography>
-											</Paper>
-										</Grid>
-									))}
-								</Grid>
-							) : (
-								<Box sx={{ textAlign: 'center', py: 4 }}>
-									<PersonOutline
+							<Grid container spacing={2}>
+								{users.flatMap((role: any) =>
+								role.users.map((user: User, index: number) => (
+									<Grid item xs={12} md={6} lg={4} key={`${role.role_name}-${user.id}-${index}`}>
+									<Paper
+										elevation={1}
 										sx={{
-											fontSize: 60,
-											color: alpha(theme.palette.text.secondary, 0.2),
-											mb: 2,
+										p: 2,
+										borderRadius: 2,
+										border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+										transition: 'all 0.2s',
+										'&:hover': {
+											boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.1)}`,
+										},
 										}}
-									/>
-									<Typography color='text.secondary'>
-										Список пользователей пуст
-									</Typography>
-								</Box>
+									>
+										<Box
+										sx={{
+											display: 'flex',
+											justifyContent: 'space-between',
+											alignItems: 'center',
+											mb: 1,
+										}}
+										>
+										<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+											<PersonOutline color='primary' />
+											<Typography variant='subtitle1' fontWeight={600}>
+											{user.login}
+											</Typography>
+										</Box>
+										<Box>
+											<Tooltip title='Редактировать'>
+											<IconButton
+												size='small'
+												color='primary'
+												onClick={() => handleEditUser(user)}
+											>
+												<EditIcon fontSize='small' />
+											</IconButton>
+											</Tooltip>
+											<Tooltip title='Удалить'>
+											<IconButton
+												size='small'
+												color='error'
+												onClick={() => handleDeleteUser(user)}
+											>
+												<DeleteIcon fontSize='small' />
+											</IconButton>
+											</Tooltip>
+										</Box>
+										</Box>
+										<Box sx={{ mt: 1 }}>
+										<Chip
+											icon={<AdminPanelSettings fontSize='small' />}
+											label={role.role_name || 'Без роли'}
+											size='small'
+											color={role.role_name === 'admin' ? 'primary' : 'default'}
+											variant='outlined'
+										/>
+										</Box>
+										<Typography
+										variant='caption'
+										color='text.secondary'
+										sx={{ display: 'block', mt: 1 }}
+										>
+										ID: {user.id} • Создан:{' '}
+										{new Date(user.created_at).toLocaleDateString()}
+										</Typography>
+									</Paper>
+									</Grid>
+								))
+								)}
+							</Grid>
+							) : (
+							<Box sx={{ textAlign: 'center', py: 4 }}>
+								<PersonOutline
+								sx={{
+									fontSize: 60,
+									color: alpha(theme.palette.text.secondary, 0.2),
+									mb: 2,
+								}}
+								/>
+								<Typography color='text.secondary'>
+								Список пользователей пуст
+								</Typography>
+							</Box>
 							)}
 						</Box>
 					)}
