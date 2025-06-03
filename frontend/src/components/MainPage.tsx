@@ -304,7 +304,7 @@ const MainPage = () => {
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
-                backgroundColor: theme.palette.background.paper,
+                backgroundColor: theme.palette.primary.light,
                 boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.12)}`,
                 position: 'relative',
                 border: dropHighlight
@@ -502,10 +502,10 @@ const MainPage = () => {
                                 <FileOpenOutlined
                                     sx={{
                                         fontSize: 60,
-                                        color: alpha(theme.palette.text.secondary, 0.5),
+                                        color: alpha(theme.palette.text.primary, 1),
                                     }}
                                 />
-                                <Typography color='text.secondary'>
+                                <Typography color='text.primary'>
                                     Выберите файл для предпросмотра или папку для загрузки
                                 </Typography>
                             </>

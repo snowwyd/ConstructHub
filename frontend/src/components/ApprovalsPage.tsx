@@ -530,12 +530,13 @@ export const ApprovalsPage = () => {
 				fullWidth
 				maxWidth='sm'
 				PaperProps={{
-					sx: {
-						borderRadius: 4,
-						boxShadow: `0 12px 40px ${alpha(theme.palette.primary.main, 0.2)}`,
-						p: 2,
-					},
-				}}
+				sx: {
+					borderRadius: 4,
+					boxShadow: `0 16px 50px ${alpha(theme.palette.primary.main, 0.25)}`,
+					p: 3,
+					backgroundColor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#ffffff',
+				},
+			}}
 			>
 				<DialogTitle
 					sx={{
@@ -543,7 +544,7 @@ export const ApprovalsPage = () => {
 						alignItems: 'center',
 						justifyContent: 'space-between',
 						borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-						py: 2,
+						py: 2.5,
 						px: 3,
 					}}
 				>
@@ -560,15 +561,17 @@ export const ApprovalsPage = () => {
 						<CloseIcon />
 					</IconButton>
 				</DialogTitle>
-	
+
 				<DialogContent sx={{ pt: 3, pb: 2 }}>
-					<Typography variant='subtitle2' gutterBottom>
+					<Typography variant='subtitle2' gutterBottom fontWeight={600}>
 						Документ: <strong>{selectedFileName}</strong>
 					</Typography>
 					<Divider sx={{ my: 2 }} />
+
 					<Typography variant='body2' color='text.secondary' paragraph>
 						Укажите причину возврата документа на доработку. Ваш комментарий будет отправлен ответственному сотруднику.
 					</Typography>
+
 					<TextField
 						autoFocus
 						margin='dense'
@@ -582,12 +585,17 @@ export const ApprovalsPage = () => {
 						placeholder='Опишите необходимые изменения...'
 						sx={{
 							'& .MuiOutlinedInput-root': {
-								borderRadius: 2.5,
+								borderRadius: 3,
+								backgroundColor:
+									theme.palette.mode === 'dark' ? alpha('#fff', 0.05) : alpha('#000', 0.05),
+							},
+							'& .MuiInputLabel-root': {
+								color: theme.palette.text.secondary,
 							},
 						}}
 					/>
 				</DialogContent>
-	
+
 				<DialogActions
 					sx={{
 						px: 3,
@@ -598,11 +606,17 @@ export const ApprovalsPage = () => {
 					<Button
 						onClick={() => setIsAnnotationModalOpen(false)}
 						variant='outlined'
+						color='inherit'
 						sx={{
-							borderRadius: 2.5,
+							borderRadius: 3,
 							textTransform: 'none',
 							fontWeight: 600,
 							px: 3,
+							color: theme.palette.text.secondary,
+							borderColor: alpha(theme.palette.text.secondary, 0.3),
+							'&:hover': {
+								borderColor: theme.palette.text.secondary,
+							},
 						}}
 					>
 						Отмена
@@ -613,13 +627,14 @@ export const ApprovalsPage = () => {
 						variant='contained'
 						color='error'
 						sx={{
-							borderRadius: 2.5,
+							borderRadius: 3,
 							textTransform: 'none',
 							fontWeight: 600,
 							px: 3,
-							boxShadow: `0 4px 12px ${alpha(theme.palette.error.main, 0.3)}`,
+							boxShadow: `0 4px 12px ${alpha(theme.palette.error.main, 0.25)}`,
 							'&:hover': {
-								boxShadow: `0 6px 16px ${alpha(theme.palette.error.dark, 0.4)}`,
+								boxShadow: `0 6px 16px ${alpha(theme.palette.error.dark, 0.35)}`,
+								transform: 'translateY(-1px)',
 							},
 						}}
 					>
